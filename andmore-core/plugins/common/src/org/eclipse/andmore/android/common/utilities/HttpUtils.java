@@ -19,18 +19,24 @@ package org.eclipse.andmore.android.common.utilities;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Authenticator;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.auth.AuthState;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
 import org.eclipse.andmore.android.common.log.AndmoreLogger;
 import org.eclipse.andmore.android.common.utilities.i18n.UtilitiesNLS;
 import org.eclipse.andmore.android.common.utilities.ui.LoginPasswordDialogCreator;
@@ -46,16 +52,34 @@ import org.eclipse.ui.internal.net.auth.NetAuthenticator;
  */
 @SuppressWarnings("restriction")
 public class HttpUtils {
-	/**
-	 * 1 second if the unit is milliseconds.
-	 */
-	private static final int ONE_SECOND = 1000;
 
 	// map of credentials authentication so the user is not repeatedly asked for
 	// them
-	private static final Map<String, Credentials> authenticationRealmCache = new HashMap<String, Credentials>();
+	private static final Map<String, Credentials> unconfirmedAuthenticationRealmCache = new HashMap<String, Credentials>();
 
-	private GetMethod getMethod;
+	private static final CredentialsProvider provider = new BasicCredentialsProvider() {
+		@Override
+		public Credentials getCredentials(AuthScope authscope) {
+			AndmoreLogger.debug(HttpUtils.class, "Client requested authentication; retrieving credentials"); //$NON-NLS-1$
+
+			Credentials credentials = super.getCredentials(authscope);
+
+			if (credentials == null) {
+				AndmoreLogger.debug(HttpUtils.class, "Credentials not found; prompting user for login/password"); //$NON-NLS-1$
+
+				LoginPasswordDialogCreator dialogCreator = new LoginPasswordDialogCreator(authscope.getHost());
+				if (dialogCreator.openLoginPasswordDialog() == LoginPasswordDialogCreator.OK) {
+
+					credentials = new UsernamePasswordCredentials(dialogCreator.getTypedLogin(),
+							dialogCreator.getTypedPassword());
+					unconfirmedAuthenticationRealmCache.put(authscope.getRealm(), credentials);
+				}
+			}
+			return credentials;
+		}
+	};
+
+	private HttpGet getMethod;
 
 	/**
 	 * Retrieves an open InputStream with the contents of the file pointed by
@@ -76,9 +100,9 @@ public class HttpUtils {
 		return getInputStreamForUrl(url, monitor, true);
 	}
 
-	private InputStream getInputStreamForUrl(String url, IProgressMonitor monitor, boolean returnStream)
+	private InputStream getInputStreamForUrl(final String url, IProgressMonitor monitor, boolean returnStream)
 			throws IOException {
-		SubMonitor subMonitor = SubMonitor.convert(monitor);
+		final SubMonitor subMonitor = SubMonitor.convert(monitor);
 
 		subMonitor.beginTask(UtilitiesNLS.HttpUtils_MonitorTask_PreparingConnection, 300);
 
@@ -100,120 +124,70 @@ public class HttpUtils {
 			}
 		}
 
-		// Creates the http client and the method to be executed
-		HttpClient client = null;
-		client = new HttpClient();
+		HttpClientBuilder clientBuilder = HttpClients.custom();
 
 		// If there is proxy data, work with it
 		if (proxyData != null) {
-			if (proxyData.getHost() != null) {
+			if (proxyData.getHost() != null && (IProxyData.HTTP_PROXY_TYPE.equals(proxyData.getType())
+					|| IProxyData.HTTPS_PROXY_TYPE.equals(proxyData.getType()))) {
+
+				String scheme = IProxyData.HTTPS_PROXY_TYPE.equals(proxyData.getType()) ? "https" : "http";
+				HttpHost proxyHost = new HttpHost(proxyData.getHost(), proxyData.getPort(), scheme);
 				// Sets proxy host and port, if any
-				client.getHostConfiguration().setProxy(proxyData.getHost(), proxyData.getPort());
-			}
+				clientBuilder.setRoutePlanner(new DefaultProxyRoutePlanner(proxyHost));
 
-			if ((proxyData.getUserId() != null) && (proxyData.getUserId().trim().length() > 0)) {
-				// Sets proxy user and password, if any
-				Credentials cred = new UsernamePasswordCredentials(proxyData.getUserId(),
-						proxyData.getPassword() == null ? "" : proxyData.getPassword()); //$NON-NLS-1$
-				client.getState().setProxyCredentials(AuthScope.ANY, cred);
-			}
-		}
+				if (proxyData.getUserId() != null && proxyData.getUserId().trim().length() > 0) {
+					// Sets proxy user and password, if any
+					Credentials cred = new UsernamePasswordCredentials(proxyData.getUserId(),
+							proxyData.getPassword() == null ? "" : proxyData.getPassword()); //$NON-NLS-1$
 
-		InputStream streamForUrl = null;
-		getMethod = new GetMethod(url);
-		getMethod.setFollowRedirects(true);
-
-		// set a 30 seconds timeout
-		HttpMethodParams params = getMethod.getParams();
-		params.setSoTimeout(15 * ONE_SECOND);
-		getMethod.setParams(params);
-
-		boolean trying = true;
-		Credentials credentials = null;
-		subMonitor.worked(100);
-		subMonitor.setTaskName(UtilitiesNLS.HttpUtils_MonitorTask_ContactingSite);
-		do {
-			AndmoreLogger.info(HttpUtils.class, "Attempting to make a connection"); //$NON-NLS-1$
-
-			// retry to connect to the site once, also set the timeout for 5
-			// seconds
-			HttpClientParams clientParams = client.getParams();
-			clientParams.setIntParameter(HttpClientParams.MAX_REDIRECTS, 1);
-			clientParams.setSoTimeout(5 * ONE_SECOND);
-			client.setParams(clientParams);
-
-			client.executeMethod(getMethod);
-			if (subMonitor.isCanceled()) {
-				break;
-			} else {
-				AuthState authorizationState = getMethod.getHostAuthState();
-				String authenticationRealm = authorizationState.getRealm();
-
-				if (getMethod.getStatusCode() == HttpStatus.SC_UNAUTHORIZED) {
-					AndmoreLogger.debug(HttpUtils.class, "Client requested authentication; retrieving credentials"); //$NON-NLS-1$
-
-					credentials = authenticationRealmCache.get(authenticationRealm);
-
-					if (credentials == null) {
-						AndmoreLogger.debug(HttpUtils.class, "Credentials not found; prompting user for login/password"); //$NON-NLS-1$
-
-						subMonitor.setTaskName(UtilitiesNLS.HttpUtils_MonitorTask_WaitingAuthentication);
-
-						LoginPasswordDialogCreator dialogCreator = new LoginPasswordDialogCreator(url);
-						if (dialogCreator.openLoginPasswordDialog() == LoginPasswordDialogCreator.OK) {
-
-							credentials = new UsernamePasswordCredentials(dialogCreator.getTypedLogin(),
-									dialogCreator.getTypedPassword());
-						} else {
-							// cancel pressed; stop trying
-							trying = false;
-
-							// set the monitor canceled to be able to stop
-							// process
-							subMonitor.setCanceled(true);
-						}
-
-					}
-
-					if (credentials != null) {
-						AuthScope scope = new AuthScope(null, -1, authenticationRealm);
-						client.getState().setCredentials(scope, credentials);
-					}
-
-					subMonitor.worked(100);
-				} else if (getMethod.getStatusCode() == HttpStatus.SC_OK) {
-					AndmoreLogger.debug(HttpUtils.class, "Http connection suceeded"); //$NON-NLS-1$
-
-					subMonitor.setTaskName(UtilitiesNLS.HttpUtils_MonitorTask_RetrievingSiteContent);
-					if ((authenticationRealm != null) && (credentials != null)) {
-						authenticationRealmCache.put(authenticationRealm, credentials);
-					} else {
-						// no authentication was necessary, just work the
-						// monitor
-						subMonitor.worked(100);
-					}
-
-					AndmoreLogger.info(HttpUtils.class, "Retrieving site content"); //$NON-NLS-1$
-
-					// if the stream should not be returned (ex: only testing
-					// the connection is
-					// possible), then null will be returned
-					if (returnStream) {
-						streamForUrl = getMethod.getResponseBodyAsStream();
-					}
-
-					// succeeded; stop trying
-					trying = false;
-
-					subMonitor.worked(100);
-				} else {
-					// unhandled return status code
-					trying = false;
-
-					subMonitor.worked(200);
+					CredentialsProvider credsProvider = new BasicCredentialsProvider();
+					credsProvider.setCredentials(new AuthScope(proxyHost), cred);
+					clientBuilder.setDefaultCredentialsProvider(credsProvider);
 				}
 			}
-		} while (trying);
+
+		}
+
+		clientBuilder.setDefaultCredentialsProvider(provider);
+
+		// Set method to be retried three times in case of error
+		clientBuilder.setRetryHandler(new DefaultHttpRequestRetryHandler(1, false));
+
+		// Creates the http client and the method to be executed
+		HttpClient client = clientBuilder.build();
+
+		InputStream streamForUrl = null;
+		getMethod = new HttpGet(url);
+
+		subMonitor.worked(100);
+		subMonitor.setTaskName(UtilitiesNLS.HttpUtils_MonitorTask_ContactingSite);
+		AndmoreLogger.info(HttpUtils.class, "Attempting to make a connection"); //$NON-NLS-1$
+		HttpResponse response = client.execute(getMethod);
+
+		if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+			AndmoreLogger.debug(HttpUtils.class, "Http connection suceeded"); //$NON-NLS-1$
+
+			subMonitor.setTaskName(UtilitiesNLS.HttpUtils_MonitorTask_RetrievingSiteContent);
+
+			URI uri = URI.create(url);
+			AuthScope scope = new AuthScope(new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme()));
+			if (unconfirmedAuthenticationRealmCache.get(scope.getRealm()) != null) {
+				provider.setCredentials(scope, unconfirmedAuthenticationRealmCache.get(scope.getRealm()));
+				unconfirmedAuthenticationRealmCache.remove(scope.getRealm());
+			}
+
+			AndmoreLogger.info(HttpUtils.class, "Retrieving site content"); //$NON-NLS-1$
+
+			// if the stream should not be returned (ex: only testing
+			// the connection is
+			// possible), then null will be returned
+			if (returnStream) {
+				streamForUrl = response.getEntity().getContent();
+			}
+
+			subMonitor.worked(100);
+		}
 
 		subMonitor.done();
 

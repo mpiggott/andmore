@@ -34,6 +34,8 @@ public class TranslateNLS extends NLS {
 
 	public static String GoogleTranslator_Error_QueryTooBig;
 
+	public static String GoogleTranslator_Error_ResponseTooBig;
+
 	public static String GoogleTranslator_Error_ToAndFromLanguagesAreEmpty;
 
 	public static String GoogleTranslator_Error_UnsupportedEncoding;

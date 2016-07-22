@@ -32,15 +32,26 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.commons.httpclient.Credentials;
-import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.HttpStatus;
-import org.apache.commons.httpclient.UsernamePasswordCredentials;
-import org.apache.commons.httpclient.auth.AuthScope;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.params.HttpMethodParams;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpException;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.Credentials;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.DefaultHttpRequestRetryHandler;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
+import org.apache.http.impl.conn.DefaultProxyRoutePlanner;
+import org.apache.http.util.EntityUtils;
 import org.eclipse.andmore.android.common.log.AndmoreLogger;
 import org.eclipse.andmore.android.common.log.UsageDataConstants;
 import org.eclipse.andmore.android.common.proxy.ProxyAuthenticator;
@@ -614,45 +625,58 @@ public final class GoogleTranslator extends ITranslator implements GoogleTransla
 			}
 		}
 
-		// Creates the http client and the method to be executed
-		HttpClient client = null;
-		client = new HttpClient();
+		HttpClientBuilder clientBuilder = HttpClients.custom();
 
 		// If there is proxy data, work with it
 		if (proxyData != null) {
-			if (proxyData.getHost() != null) {
+			if (proxyData.getHost() != null && (IProxyData.HTTP_PROXY_TYPE.equals(proxyData.getType())
+					|| IProxyData.HTTPS_PROXY_TYPE.equals(proxyData.getType()))) {
+
+				String scheme = IProxyData.HTTPS_PROXY_TYPE.equals(proxyData.getType()) ? "https" : "http";
+				HttpHost proxyHost = new HttpHost(proxyData.getHost(), proxyData.getPort(), scheme);
 				// Sets proxy host and port, if any
-				client.getHostConfiguration().setProxy(proxyData.getHost(), proxyData.getPort());
+				clientBuilder.setRoutePlanner(new DefaultProxyRoutePlanner(proxyHost));
+
+				if (proxyData.getUserId() != null && proxyData.getUserId().trim().length() > 0) {
+					// Sets proxy user and password, if any
+					Credentials cred = new UsernamePasswordCredentials(proxyData.getUserId(),
+							proxyData.getPassword() == null ? "" : proxyData.getPassword()); //$NON-NLS-1$
+
+					CredentialsProvider credsProvider = new BasicCredentialsProvider();
+					credsProvider.setCredentials(new AuthScope(proxyHost), cred);
+					clientBuilder.setDefaultCredentialsProvider(credsProvider);
+				}
 			}
 
-			if (proxyData.getUserId() != null && proxyData.getUserId().trim().length() > 0) {
-				// Sets proxy user and password, if any
-				Credentials cred = new UsernamePasswordCredentials(proxyData.getUserId(),
-						proxyData.getPassword() == null ? "" : proxyData.getPassword()); //$NON-NLS-1$
-				client.getState().setProxyCredentials(AuthScope.ANY, cred);
-			}
 		}
+
+		// Set method to be retried three times in case of error
+		clientBuilder.setRetryHandler(new DefaultHttpRequestRetryHandler(RETRIES, false));
+
+		// Creates the http client and the method to be executed
+		HttpClient client = clientBuilder.build();
 
 		// Creating the method to be executed, the URL at this point is enough
 		// because it is complete
-		GetMethod method = new GetMethod(url.toString());
-
-		// Set method to be retried three times in case of error
-		method.getParams().setParameter(HttpMethodParams.RETRY_HANDLER,
-				new DefaultHttpMethodRetryHandler(RETRIES, false));
-
-		method.setRequestHeader(REFERER_HEADER, REFERER_SITE);
-
-		// Set the connection timeout
-		client.getHttpConnectionManager().getParams().setConnectionTimeout(new Integer(TIMEOUT));
+		HttpGet method = new HttpGet(url.toString());
+		method.addHeader(REFERER_HEADER, REFERER_SITE);
 
 		String result = ""; //$NON-NLS-1$
 		try {
 			// Execute the method.
 			int statusCode;
 			try {
-				statusCode = client.executeMethod(method);
-				result = method.getResponseBodyAsString(MAX_SIZE);
+				HttpResponse response = client.execute(method);
+				statusCode = response.getStatusLine().getStatusCode();
+
+				HttpEntity entity = response.getEntity();
+				if (entity.getContentLength() > MAX_SIZE) {
+					EntityUtils.consumeQuietly(entity);
+					throw new IOException(TranslateNLS.GoogleTranslator_Error_ResponseTooBig);
+				}
+				else {
+					result = EntityUtils.toString(entity);
+				}
 			} catch (IOException e) {
 				throw new HttpException(TranslateNLS.GoogleTranslator_Error_CannotConnectToServer + e.getMessage());
 			}
@@ -664,9 +688,7 @@ public final class GoogleTranslator extends ITranslator implements GoogleTransla
 
 			// Unescape any possible HTML sequence
 			result = unescapeHTML(result);
-
 		}
-
 		finally {
 			// Release the connection.
 			method.releaseConnection();
