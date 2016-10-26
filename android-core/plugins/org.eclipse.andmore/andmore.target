@@ -23,7 +23,7 @@
 </location>
 <location includeAllPlatforms="true" includeConfigurePhase="true" includeMode="planner" includeSource="true" type="InstallableUnit">
 <unit id="org.eclipse.wb.core.xml.feature.feature.group" version="0.0.0"/>
-<repository location="http://download.eclipse.org/windowbuilder/WB/release/R201506241200-1/4.5/"/>
+<repository location="http://download.eclipse.org/windowbuilder/WB/release/4.6/"/>
 </location>
 <location includeAllPlatforms="true" includeConfigurePhase="true" includeMode="planner" includeSource="true" type="InstallableUnit">
 <unit id="org.eclipse.sequoyah.vnc.feature.feature.group" version="2.1.0.N20120718-0509"/>
