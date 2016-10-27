@@ -61,6 +61,11 @@
 			<url>${orbit-site}</url>
 		</repository>
 		<repository>
+			<id>orbit-R20160520211859</id>
+			<layout>p2</layout>
+			<url>http://download.eclipse.org/tools/orbit/downloads/drops/R20160520211859/repository</url>
+		</repository>
+		<repository>
 			<id>m2e-site</id>
 			<url>${m2e-update-site}</url>
 			<layout>p2</layout>
