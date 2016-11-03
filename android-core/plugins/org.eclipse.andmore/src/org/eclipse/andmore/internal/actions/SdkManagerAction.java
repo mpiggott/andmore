@@ -19,7 +19,7 @@ package org.eclipse.andmore.internal.actions;
 import com.android.SdkConstants;
 import com.android.annotations.NonNull;
 import com.android.annotations.Nullable;
-import com.android.sdklib.io.FileOp;
+import com.android.repository.io.FileOpUtils;
 import com.android.sdklib.repository.ISdkChangeListener;
 import com.android.utils.GrabProcessOutput;
 import com.android.utils.GrabProcessOutput.IProcessOutput;
@@ -164,7 +164,7 @@ public class SdkManagerAction implements IWorkbenchWindowActionDelegate, IObject
                     final int sleepMs = 100;
                     monitor.beginTask("Starting Android SDK Manager", numIter);
 
-                    File androidBat = FileOp.append(
+                    File androidBat = FileOpUtils.append(
                             osSdkLocation,
                             SdkConstants.FD_TOOLS,
                             SdkConstants.androidCmdName());

@@ -53,6 +53,7 @@ import com.android.SdkConstants;
 import com.android.sdklib.AndroidVersion;
 import com.android.sdklib.IAndroidTarget;
 import com.android.sdklib.internal.avd.AvdInfo;
+import com.android.sdklib.internal.avd.AvdInfo.AvdStatus;
 import com.android.sdklib.internal.avd.AvdManager;
 import com.android.sdkuilib.internal.widgets.MessageBoxLog;
 import com.android.utils.ILogger;
@@ -904,7 +905,7 @@ public class SdkUtils {
 		ILogger log = new MessageBoxLog(String.format("Result of updating AVD '%s':", avdInfo.getName()), //$NON-NLS-1$
 				display, false);
 		try {
-			avdManager.updateAvd(avdInfo, log);
+			avdManager.updateAvd(avdInfo, avdInfo.getProperties(), AvdStatus.OK, log);
 			// display the result
 			if (log instanceof MessageBoxLog) {
 				((MessageBoxLog) log).displayResult(true);
