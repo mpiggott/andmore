@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>org.eclipse.andmore</groupId>
+	<artifactId>dependencies-downloader</artifactId>
+	<version>1</version>
+	<packaging>pom</packaging>
+
+	<description>Can be used to download all dependencies from the Android repository on bintray</description>
+
+	<properties>
+		<android.version>25.2.2</android.version>
+	</properties>
+	
+	<modules>
+		<module>dependencies-org.eclipse.andmore</module>
+		<module>dependencies-org.eclipse.andmore.base</module>
+		<module>dependencies-org.eclipse.andmore.ddms</module>
+		<module>dependencies-org.eclipse.andmore.hierarchyviewer</module>
+	</modules>
+
+	<repositories>
+		<repository>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+			<id>android-tools</id>
+			<name>android-tools</name>
+			<url>https://dl.bintray.com/android/android-tools</url>
+		</repository>
+	</repositories>
+</project>
