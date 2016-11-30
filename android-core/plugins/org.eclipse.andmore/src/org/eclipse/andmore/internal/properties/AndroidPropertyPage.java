@@ -22,6 +22,8 @@ import com.android.sdklib.internal.project.ProjectProperties;
 import com.android.sdklib.internal.project.ProjectPropertiesWorkingCopy;
 import com.android.sdkuilib.internal.widgets.SdkTargetSelector;
 
+import java.util.Collection;
+
 import org.eclipse.andmore.AndmoreAndroidPlugin;
 import org.eclipse.andmore.internal.sdk.ProjectState;
 import org.eclipse.andmore.internal.sdk.Sdk;
@@ -67,7 +69,7 @@ public class AndroidPropertyPage extends PropertyPage {
         // get the targets from the sdk
         IAndroidTarget[] targets = null;
         if (Sdk.getCurrent() != null) {
-            targets = Sdk.getCurrent().getTargets();
+            targets = Sdk.getCurrent().getTargets().toArray(new IAndroidTarget[0]);
         }
 
         // build the UI.

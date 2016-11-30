@@ -16,30 +16,14 @@
 
 package org.eclipse.andmore.internal.build.builders;
 
-import com.android.SdkConstants;
-import com.android.annotations.NonNull;
-import com.android.annotations.Nullable;
-import com.android.ide.common.xml.ManifestData;
-import com.android.io.StreamException;
-import com.android.manifmerger.ManifestMerger;
-import com.android.manifmerger.MergerLog;
-import com.android.sdklib.AndroidVersion;
-import com.android.sdklib.BuildToolInfo;
-import com.android.sdklib.IAndroidTarget;
-import com.android.sdklib.build.RenderScriptChecker;
-import com.android.sdklib.build.RenderScriptProcessor;
-import com.android.sdklib.internal.build.BuildConfigGenerator;
-import com.android.sdklib.internal.build.SymbolLoader;
-import com.android.sdklib.internal.build.SymbolWriter;
-import com.android.sdklib.internal.project.ProjectProperties;
-import com.android.sdklib.io.FileOp;
-import com.android.sdklib.repository.FullRevision;
-import com.android.utils.ILogger;
-import com.android.utils.Pair;
-import com.android.xml.AndroidManifest;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.eclipse.andmore.AndmoreAndroidConstants;
 import org.eclipse.andmore.AndmoreAndroidPlugin;
@@ -83,14 +67,30 @@ import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.JavaCore;
 import org.xml.sax.SAXException;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
-import javax.xml.parsers.ParserConfigurationException;
+import com.android.SdkConstants;
+import com.android.annotations.NonNull;
+import com.android.annotations.Nullable;
+import com.android.ide.common.xml.ManifestData;
+import com.android.io.StreamException;
+import com.android.manifmerger.ManifestMerger;
+import com.android.manifmerger.MergerLog;
+import com.android.repository.Revision;
+import com.android.repository.io.FileOpUtils;
+import com.android.sdklib.AndroidVersion;
+import com.android.sdklib.BuildToolInfo;
+import com.android.sdklib.IAndroidTarget;
+import com.android.sdklib.build.RenderScriptChecker;
+import com.android.sdklib.build.RenderScriptProcessor;
+import com.android.sdklib.internal.build.BuildConfigGenerator;
+import com.android.sdklib.internal.build.SymbolLoader;
+import com.android.sdklib.internal.build.SymbolWriter;
+import com.android.sdklib.internal.project.ProjectProperties;
+import com.android.utils.ILogger;
+import com.android.utils.Pair;
+import com.android.xml.AndroidManifest;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 
 /**
  * Pre Java Compiler.
@@ -433,7 +433,7 @@ public class PreCompilerBuilder extends BaseBuilder {
             }
 
             if (projectState.getRenderScriptSupportMode()) {
-                FullRevision minBuildToolsRev = new FullRevision(19,0,3);
+                Revision minBuildToolsRev = new Revision(19,0,3);
                 if (mBuildToolInfo.getRevision().compareTo(minBuildToolsRev) == -1) {
                     String msg = "RenderScript support mode requires Build-Tools 19.0.3 or later.";
                     AndmoreAndroidPlugin.printErrorToConsole(project, msg);
@@ -966,7 +966,7 @@ public class PreCompilerBuilder extends BaseBuilder {
         // manifest over.
         if (enabled == false || libProjects.size() == 0) {
             try {
-                new FileOp().copyFile(manifest.getLocation().toFile(),
+                FileOpUtils.create().copyFile(manifest.getLocation().toFile(),
                         outFile.getLocation().toFile());
 
                 outFile.refreshLocal(IResource.DEPTH_INFINITE, mDerivedProgressMonitor);

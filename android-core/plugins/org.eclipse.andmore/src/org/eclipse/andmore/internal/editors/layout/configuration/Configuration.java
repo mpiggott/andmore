@@ -980,8 +980,7 @@ public class Configuration {
             @NonNull String id) {
         Sdk currentSdk = Sdk.getCurrent();
         if (currentSdk != null) {
-            IAndroidTarget[] targets = currentSdk.getTargets();
-            for (IAndroidTarget target : targets) {
+            for (IAndroidTarget target : currentSdk.getTargets()) {
                 if (id.equals(targetToString(target))) {
                     return target;
                 }

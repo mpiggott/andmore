@@ -50,11 +50,14 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.PlatformUI;
 
 import com.android.SdkConstants;
+import com.android.repository.io.FileOpUtils;
+import com.android.repository.testframework.FakeProgressIndicator;
 import com.android.sdklib.AndroidVersion;
 import com.android.sdklib.IAndroidTarget;
 import com.android.sdklib.internal.avd.AvdInfo;
 import com.android.sdklib.internal.avd.AvdInfo.AvdStatus;
 import com.android.sdklib.internal.avd.AvdManager;
+import com.android.sdklib.repository.AndroidSdkHandler;
 import com.android.sdkuilib.internal.widgets.MessageBoxLog;
 import com.android.utils.ILogger;
 
@@ -89,7 +92,7 @@ public class SdkUtils {
 		String sdkDir = null;
 		Sdk sdk = getCurrentSdk();
 		if (sdk != null) {
-			sdkDir = sdk.getSdkOsLocation();
+			sdkDir = sdk.getSdkFileLocation().getAbsolutePath();
 		}
 		return sdkDir;
 	}
@@ -125,9 +128,9 @@ public class SdkUtils {
 		IAndroidTarget realTarget = null;
 		if (target == null) {
 			AndmoreLogger.warn(SdkUtils.class, "Trying to find a suitable aapt application to use"); //$NON-NLS-1$
-			IAndroidTarget[] allTargets = Sdk.getCurrent().getTargets();
-			if (allTargets.length > 0) {
-				realTarget = allTargets[0];
+			Collection<IAndroidTarget> allTargets = Sdk.getCurrent().getTargets();
+			if (allTargets.size() > 0) {
+				realTarget = allTargets.iterator().next();
 			}
 		} else {
 			realTarget = target;
@@ -223,7 +226,7 @@ public class SdkUtils {
 		IAndroidTarget[] allTargets = null;
 		Sdk sdk = getCurrentSdk();
 		if (sdk != null) {
-			allTargets = sdk.getTargets();
+			allTargets = sdk.getTargets().toArray(new IAndroidTarget[0]);
 		}
 		return allTargets;
 	}
@@ -568,7 +571,7 @@ public class SdkUtils {
 	public static Object[] getTargets(Sdk sdk) {
 		Object[] targets = null;
 		if (sdk != null) {
-			targets = sdk.getTargets();
+			targets = sdk.getTargets().toArray();
 		}
 		return targets;
 	}
@@ -748,7 +751,7 @@ public class SdkUtils {
 	}
 
 	public static boolean isPlatformTarget(String avdName) {
-		IAndroidTarget target = getValidVm(avdName).getTarget();
+		IAndroidTarget target = getCurrentSdk().getAndroidTargetFor(getValidVm(avdName));
 		return target != null ? target.isPlatform() : false;
 	}
 
@@ -786,7 +789,7 @@ public class SdkUtils {
 	}
 
 	public static String getBaseTarget(String name) {
-		IAndroidTarget target = getValidVm(name).getTarget();
+		IAndroidTarget target = getCurrentSdk().getAndroidTargetFor(getValidVm(name));
 		while (!target.isPlatform()) {
 			target = target.getParent();
 		}
@@ -809,9 +812,7 @@ public class SdkUtils {
 			}
 		};
 
-		Sdk sdk = getCurrentSdk();
-		IAndroidTarget[] targets = sdk.getTargets();
-		for (IAndroidTarget target : targets) {
+		for (IAndroidTarget target : getCurrentSdk().getTargets()) {
 			File folder = new File(target.getLocation());
 			if (folder.list(omsFilenameFilter).length > 0) {
 				result = true;
@@ -841,8 +842,7 @@ public class SdkUtils {
 
 		Sdk sdk = getCurrentSdk();
 		if (sdk != null) {
-			IAndroidTarget[] targets = sdk.getTargets();
-			for (IAndroidTarget target : targets) {
+			for (IAndroidTarget target : sdk.getTargets()) {
 				File folder = new File(target.getLocation());
 				if (folder.list(jilFilenameFilter).length > 0) {
 					result = true;

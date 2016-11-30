@@ -18,11 +18,12 @@ package org.eclipse.andmore.internal.actions;
 
 import com.android.SdkConstants;
 import com.android.annotations.Nullable;
-import com.android.sdklib.SdkManager;
+import com.android.repository.io.FileOp;
+import com.android.repository.io.FileOpUtils;
+import com.android.repository.testframework.FakeProgressIndicator;
 import com.android.sdklib.internal.project.ProjectProperties;
 import com.android.sdklib.internal.project.ProjectProperties.PropertyType;
 import com.android.sdklib.internal.project.ProjectPropertiesWorkingCopy;
-import com.android.sdklib.io.FileOp;
 import com.android.sdkuilib.internal.repository.ui.AdtUpdateDialog;
 import com.android.utils.NullLogger;
 import com.android.utils.Pair;
@@ -64,6 +65,7 @@ import org.eclipse.ui.IWorkbenchWindowActionDelegate;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -230,8 +232,8 @@ public class AddSupportJarAction implements IObjectActionDelegate {
         final Sdk sdk = Sdk.getCurrent();
         if (sdk != null) {
             String sdkLocation = sdk.getSdkOsLocation();
-            SdkManager manager = SdkManager.createManager(sdkLocation, NullLogger.getLogger());
-            Map<String, Integer> versions = manager.getExtrasVersions();
+//            SdkManager manager = SdkManager.createManager(sdkLocation, NullLogger.getLogger());
+            Map<String, Integer> versions = Collections.emptyMap(); //manager.getExtrasVersions();
             Integer version = versions.get(VENDOR_ID + '/' + SUPPORT_ID);
             if (version == null) {
                 // Check the old compatibility library. When the library is updated in-place
@@ -369,8 +371,8 @@ public class AddSupportJarAction implements IObjectActionDelegate {
         final Sdk sdk = Sdk.getCurrent();
         if (sdk != null) {
             String sdkLocation = sdk.getSdkOsLocation();
-            SdkManager manager = SdkManager.createManager(sdkLocation, NullLogger.getLogger());
-            Map<String, Integer> versions = manager.getExtrasVersions();
+//          SdkManager manager = SdkManager.createManager(sdkLocation, NullLogger.getLogger());
+          Map<String, Integer> versions = Collections.emptyMap(); //manager.getExtrasVersions();
             Integer version = versions.get(VENDOR_ID + '/' + SUPPORT_ID);
             if (version != null) {
                 File supportPath = new File(sdkLocation,
@@ -606,7 +608,7 @@ public class AddSupportJarAction implements IObjectActionDelegate {
         File destPath = loc.toFile();
 
         // Only modify the file if necessary so that we don't trigger unnecessary recompilations
-        FileOp f = new FileOp();
+        FileOp f = FileOpUtils.create();
         if (!f.isFile(destPath) || !f.isSameFile(jarPath, destPath)) {
             f.copyFile(jarPath, destPath);
             // Make sure Eclipse discovers java.io file changes

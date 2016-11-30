@@ -943,7 +943,7 @@ public class EclipseLintClient extends LintClient {
     public IAndroidTarget[] getTargets() {
         Sdk sdk = Sdk.getCurrent();
         if (sdk != null) {
-            return sdk.getTargets();
+            return sdk.getTargets().toArray(new IAndroidTarget[0]);
         } else {
             return new IAndroidTarget[0];
         }
