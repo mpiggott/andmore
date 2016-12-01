@@ -15,7 +15,7 @@ Bundle-ClassPath: .,
  libs/propertysheet.jar,
  libs/ant-glob.jar,
  libs/swtmenubar.jar,
- libs/manifest-merger.jar
+ libs/manifest-merger-25.2.2.jar
 Bundle-Activator: org.eclipse.andmore.AndmoreAndroidPlugin
 Bundle-Vendor: Eclipse Andmore
 Require-Bundle: org.eclipse.andmore.base,

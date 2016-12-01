@@ -16,6 +16,7 @@
 
 package org.eclipse.andmore.internal.build.builders;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,7 +45,6 @@ import org.eclipse.andmore.internal.project.XmlErrorHandler.BasicXmlErrorListene
 import org.eclipse.andmore.internal.resources.manager.IdeScanningContext;
 import org.eclipse.andmore.internal.resources.manager.ProjectResources;
 import org.eclipse.andmore.internal.resources.manager.ResourceManager;
-import org.eclipse.andmore.internal.sdk.AdtManifestMergeCallback;
 import org.eclipse.andmore.internal.sdk.ProjectState;
 import org.eclipse.andmore.internal.sdk.Sdk;
 import org.eclipse.andmore.io.IFileWrapper;
@@ -69,11 +69,15 @@ import org.xml.sax.SAXException;
 
 import com.android.SdkConstants;
 import com.android.annotations.NonNull;
-import com.android.annotations.Nullable;
 import com.android.ide.common.xml.ManifestData;
 import com.android.io.StreamException;
-import com.android.manifmerger.ManifestMerger;
-import com.android.manifmerger.MergerLog;
+import com.android.manifmerger.ManifestMerger2;
+import com.android.manifmerger.ManifestMerger2.Invoker;
+import com.android.manifmerger.ManifestMerger2.MergeFailureException;
+import com.android.manifmerger.ManifestMerger2.MergeType;
+import com.android.manifmerger.MergingReport;
+import com.android.manifmerger.MergingReport.MergedManifestKind;
+import com.android.manifmerger.MergingReport.Record;
 import com.android.repository.Revision;
 import com.android.repository.io.FileOpUtils;
 import com.android.sdklib.AndroidVersion;
@@ -85,7 +89,6 @@ import com.android.sdklib.internal.build.BuildConfigGenerator;
 import com.android.sdklib.internal.build.SymbolLoader;
 import com.android.sdklib.internal.build.SymbolWriter;
 import com.android.sdklib.internal.project.ProjectProperties;
-import com.android.utils.ILogger;
 import com.android.utils.Pair;
 import com.android.xml.AndroidManifest;
 import com.google.common.collect.ArrayListMultimap;
@@ -977,67 +980,35 @@ public class PreCompilerBuilder extends BaseBuilder {
                 return false;
             }
         } else {
-            final ArrayList<String> errors = new ArrayList<String>();
 
             // TODO change MergerLog.wrapSdkLog by a custom IMergerLog that will create
             // and maintain error markers.
-            ManifestMerger merger = new ManifestMerger(
-                MergerLog.wrapSdkLog(new ILogger() {
-                    @Override
-                    public void warning(@NonNull String warningFormat, Object... args) {
-                        AndmoreAndroidPlugin.printToConsole(getProject(), String.format(warningFormat, args));
-                    }
+            Invoker invoker = ManifestMerger2.newMerger(manifest.getLocation().toFile(), AndmoreAndroidPlugin.getDefault(), MergeType.APPLICATION); // TODO Get the Project type
 
-                    @Override
-                    public void info(@NonNull String msgFormat, Object... args) {
-                        AndmoreAndroidPlugin.printToConsole(getProject(), String.format(msgFormat, args));
-                    }
-
-                    @Override
-                    public void verbose(@NonNull String msgFormat, Object... args) {
-                        info(msgFormat, args);
-                    }
-
-                    @Override
-                    public void error(@Nullable Throwable t, @Nullable String errorFormat,
-                            Object... args) {
-                        errors.add(String.format(errorFormat, args));
-                    }
-                }),
-                new AdtManifestMergeCallback());
-
-            File[] libManifests = new File[libProjects.size()];
-            int libIndex = 0;
             for (IProject lib : libProjects) {
-                libManifests[libIndex++] = lib.getFile(SdkConstants.FN_ANDROID_MANIFEST_XML)
-                        .getLocation().toFile();
+                invoker.addLibraryManifest(lib.getFile(SdkConstants.FN_ANDROID_MANIFEST_XML)
+                        .getLocation().toFile());
             }
-
-            if (merger.process(
-                    outFile.getLocation().toFile(),
-                    manifest.getLocation().toFile(),
-                    libManifests,
-                    null /*injectAttributes*/, null /*packageOverride*/) == false) {
-                if (errors.size() > 1) {
+            
+            try {
+                MergingReport report = invoker.merge();
+                if (report.getResult().isError()) {
                     StringBuilder sb = new StringBuilder();
-                    for (String s : errors) {
-                        sb.append(s).append('\n');
+                    for (Record record : report.getLoggingRecords()) {
+                        if (record.getSeverity() == MergingReport.Record.Severity.ERROR) {
+                            sb.append(record.getMessage()).append('\n');
+                        }
                     }
-
-                    markProject(AndmoreAndroidConstants.MARKER_MANIFMERGER, sb.toString(),
-                            IMarker.SEVERITY_ERROR);
-
-                } else if (errors.size() == 1) {
-                    markProject(AndmoreAndroidConstants.MARKER_MANIFMERGER, errors.get(0),
-                            IMarker.SEVERITY_ERROR);
-                } else {
-                    markProject(AndmoreAndroidConstants.MARKER_MANIFMERGER, "Unknown error merging manifest",
-                            IMarker.SEVERITY_ERROR);
+                    markProject(AndmoreAndroidConstants.MARKER_MANIFMERGER, sb.toString(), IMarker.SEVERITY_ERROR);
+                    return false;
                 }
+                outFile.setContents(new ByteArrayInputStream(report.getMergedDocument(MergedManifestKind.MERGED).getBytes()), 0, mDerivedProgressMonitor);
+            }
+            catch (MergeFailureException e) {
+                markProject(AndmoreAndroidConstants.MARKER_MANIFMERGER, "Unknown error merging manifest", IMarker.SEVERITY_ERROR);
                 return false;
             }
 
-            outFile.refreshLocal(IResource.DEPTH_INFINITE, mDerivedProgressMonitor);
             saveProjectBooleanProperty(PROPERTY_MERGE_MANIFEST, mMustMergeManifest = false);
         }
 
