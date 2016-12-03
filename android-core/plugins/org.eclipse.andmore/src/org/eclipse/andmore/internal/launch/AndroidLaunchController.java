@@ -1260,7 +1260,13 @@ public final class AndroidLaunchController implements IDebugBridgeChangeListener
      */
     private String doInstall(DelayedLaunchInfo launchInfo, final String remotePath,
             final IDevice device, boolean reinstall) throws InstallException {
-        return device.installRemotePackage(remotePath, reinstall);
+        try {
+            device.installRemotePackage(remotePath, reinstall);
+            return null;
+        }
+        catch (InstallException e) {
+            return e.getMessage();
+        }
     }
 
     /**
