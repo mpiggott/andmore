@@ -969,13 +969,15 @@ public class PreCompilerBuilder extends BaseBuilder {
         // manifest over.
         if (enabled == false || libProjects.size() == 0) {
             try {
-                FileOpUtils.create().copyFile(manifest.getLocation().toFile(),
-                        outFile.getLocation().toFile());
-
-                outFile.refreshLocal(IResource.DEPTH_INFINITE, mDerivedProgressMonitor);
+                if (outFile.exists()) {
+                    outFile.setContents(manifest.getContents(), 0, mDerivedProgressMonitor);
+                }
+                else {
+                    outFile.create(manifest.getContents(), 0, mDerivedProgressMonitor);
+                }
 
                 saveProjectBooleanProperty(PROPERTY_MERGE_MANIFEST, mMustMergeManifest = false);
-            } catch (IOException e) {
+            } catch (CoreException e) {
                 handleException(e, "Failed to copy Manifest");
                 return false;
             }

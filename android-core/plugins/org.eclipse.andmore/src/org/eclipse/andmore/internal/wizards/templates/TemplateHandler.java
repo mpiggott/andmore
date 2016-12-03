@@ -946,11 +946,12 @@ class TemplateHandler {
     
     private static File createTemp(Document doc) throws IOException {
         File tmp = File.createTempFile("android-manifest", "xml");
-        tmp.deleteOnExit();
+        tmp.delete();
 
         FileUtils.createFile(tmp, EclipseXmlPrettyPrinter.prettyPrint(doc,
                 EclipseXmlFormatPreferences.create(),  XmlFormatStyle.MANIFEST, null,
                 false));
+        tmp.deleteOnExit();
         return tmp;
     }
 
