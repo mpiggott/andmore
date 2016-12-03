@@ -111,7 +111,7 @@ public class FixProjectAction implements IObjectActionDelegate {
                     if (monitor != null) {
                         monitor.beginTask("Fix Project Properties", 6);
                     }
-                    fixAdtEntries(project, monitor);
+//                    fixAdtEntries(project, monitor);
 
                     ProjectHelper.fixProject(project);
                     if (monitor != null) {

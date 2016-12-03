@@ -16,8 +16,11 @@
 
 package org.eclipse.andmore.internal.actions;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -31,6 +34,7 @@ import org.eclipse.andmore.internal.sdk.Sdk;
 import org.eclipse.core.filesystem.EFS;
 import org.eclipse.core.filesystem.IFileStore;
 import org.eclipse.core.filesystem.IFileSystem;
+import org.eclipse.core.resources.ICommand;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
@@ -484,6 +488,26 @@ public class AddSupportJarAction implements IObjectActionDelegate {
                 }
             }
 
+            // Resources copied from the SDK can have old namespace references
+			try {
+				// Update the NatureIds
+				description = newProject.getDescription();
+				String[] natureIds = description.getNatureIds();
+				for (int i = 0; i < natureIds.length; i++) {
+					natureIds[i] = natureIds[i].replace("com.android.ide.eclipse.adt", "org.eclipse.andmore");
+				}
+				description.setNatureIds(natureIds);
+				ICommand[] commands = description.getBuildSpec();
+				for (int i = 0; i < commands.length; i++) {
+					commands[i].setBuilderName(commands[i].getBuilderName().replace("com.android.ide.eclipse.adt", "org.eclipse.andmore"));
+				}
+				description.setBuildSpec(commands);
+
+				// Update the classpath
+				updateClasspath(project.getFile(".classpath"), monitor);
+			} catch (CoreException e) {
+			}
+
             newProject.open(monitor);
 
             return newProject;
@@ -491,6 +515,37 @@ public class AddSupportJarAction implements IObjectActionDelegate {
             AndmoreAndroidPlugin.log(e, null);
             return null;
         }
+    }
+    
+    private static void updateClasspath(IFile file, IProgressMonitor monitor) {
+        BufferedReader reader = null;
+        StringBuilder builder = new StringBuilder();
+        try {
+            reader = new BufferedReader(new InputStreamReader(file.getContents()));
+            int read = -1;
+            char[] bytes = new char[1024];
+            while ((read = reader.read(bytes)) != -1) {
+                builder.append(bytes, 0, read);
+            }
+        }
+        catch (Exception e) {
+            // do nothing I 
+        }
+        finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                }
+                catch (IOException e) {
+                    return;
+                }
+            }
+        }
+		try {
+			String content = builder.toString().replaceAll("com.android.ide.eclipse.adt", "org.eclipse.andmore");
+			file.setContents(new ByteArrayInputStream(content.getBytes()), true, false, monitor);
+		} catch (CoreException e) {
+		}
     }
 
     /**
