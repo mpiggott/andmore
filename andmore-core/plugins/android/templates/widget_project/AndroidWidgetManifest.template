@@ -3,7 +3,7 @@
       package="PACKAGE"
       android:versionCode="1"
       android:versionName="1.0">
-    <application android:icon="@drawable/ic_launcher" android:label="APPLICATION_NAME">
+    <application android:icon="@mipmap/ic_launcher" android:label="APPLICATION_NAME">
 ACTIVITIES
 RECEIVERS
     </application>
