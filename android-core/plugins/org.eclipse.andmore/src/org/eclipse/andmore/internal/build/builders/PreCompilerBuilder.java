@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -280,7 +282,13 @@ public class PreCompilerBuilder extends BaseBuilder {
             IAndroidTarget projectTarget = projectState.getTarget();
 
             // get the libraries
-            List<IProject> libProjects = projectState.getFullLibraryProjects();
+            List<IProject> libProjects = new LinkedList<IProject>(projectState.getFullLibraryProjects());
+            for (Iterator<IProject> iter = libProjects.iterator(); iter.hasNext();) {
+                IProject libProject = iter.next();
+                if (!libProject.isOpen()) {
+                    iter.remove();
+                }
+            }
             result = libProjects.toArray(new IProject[libProjects.size()]);
 
             IJavaProject javaProject = JavaCore.create(project);
