@@ -321,6 +321,9 @@ public abstract class BaseBuilder extends IncrementalProjectBuilder {
             projectState = Sdk.getProjectState(javaProject.getProject());
         }
 
+        if (projectState == null) {
+            throw new AbortBuildException();
+        }
         // get the target for the project
         IAndroidTarget target = projectState.getTarget();
 
