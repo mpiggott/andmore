@@ -11,7 +11,7 @@
 	<description>Can be used to download all dependencies from the Android repository on bintray</description>
 
 	<properties>
-		<android.version>25.2.2</android.version>
+		<android.version>25.2.3</android.version>
 	</properties>
 	
 	<modules>
